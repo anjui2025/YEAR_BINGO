@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Caramel Unit - Life Bingo Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #F5E6DA;
+            --accent-color: #8B5E3C;
+            --text-color: #4A3728;
+            --grid-bg: rgba(255, 255, 255, 0.4);
+            --grid-border: 1px solid rgba(255, 255, 255, 0.8);
+            --glass-panel: rgba(255, 255, 255, 0.85);
+            --highlight-color: rgba(212, 175, 55, 0.3);
+            --font-serif: 'Noto Serif TC', serif;
+            --font-sans: 'Noto Sans TC', sans-serif;
+            --app-bar-height: 60px;
+            --tab-bar-height: 70px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            font-family: var(--font-sans);
+            background-color: #e0e0e0;
+            background-image: radial-gradient(#ccc 1px, transparent 1px);
+            background-size: 20px 20px;
+            height: 100vh; /* fallback */
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: #333;
+        }
+
+        /* --- 1. Top App Bar --- */
+        .app-bar {
+            height: var(--app-bar-height);
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(10px);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            z-index: 200;
+            position: relative;
+        }
+        
+        .app-logo-link {
+            text-decoration: none;
+            display: flex; align-items: center; gap: 10px;
+            transition: opacity 0.2s;
+        }
+        .app-logo-link:hover { opacity: 0.7; }
+        
+        .app-logo-text {
+            font-family: var(--font-serif); font-weight: 700; color: var(--accent-color); font-size: 18px;
+        }
+        .app-logo-img { height: 30px; width: auto; }
+        
+        .app-action {
+            font-size: 14px; color: #666; cursor: pointer; padding: 8px;
+        }
+
+        /* --- 2. Main Layout Container --- */
+        .main-container {
+            display: flex;
+            flex: 1;
+            height: calc(100% - var(--app-bar-height));
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- 3. Preview Stage --- */
+        .preview-stage {
+            flex: 1;
+            display: flex; justify-content: center; align-items: center;
+            position: relative; overflow: hidden; 
+            padding: 20px;
+            background: #e0e0e0;
+            transition: all 0.3s ease;
+        }
+
+        #render-target {
+            width: 1080px; height: 1080px; 
+            background-color: var(--bg-color);
+            background-size: cover; background-position: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            transform-origin: center center; position: relative; flex-shrink: 0; 
+        }
+
+        /* --- 4. Controls Panel (Drawer/Sidebar) --- */
+        .controls-panel {
+            background: var(--glass-panel);
+            backdrop-filter: blur(30px);
+            z-index: 100;
+            display: flex; flex-direction: column;
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* Tabs Navigation */
+        .tab-bar {
+            height: var(--tab-bar-height);
+            background: rgba(255,255,255,0.95);
+            border-top: 1px solid rgba(0,0,0,0.05);
+            display: flex; justify-content: space-around; align-items: center;
+            flex-shrink: 0;
+        }
+        .tab-item {
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 4px; color: #999; font-size: 11px; cursor: pointer; transition: 0.2s; height: 100%;
+        }
+        .tab-item i { font-size: 20px; margin-bottom: 2px; }
+        .tab-item.active { color: var(--accent-color); }
+
+        /* Drawer Content Area */
+        .drawer-content-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            position: relative;
+        }
+        .drawer-section { display: none; animation: fadeIn 0.3s; }
+        .drawer-section.active { display: block; }
+
+        /* Mobile Handle */
+        .drawer-handle-bar {
+            width: 100%; height: 24px; display: none; /* Desktop default hidden */
+            justify-content: center; align-items: center; cursor: pointer; flex-shrink: 0;
+        }
+        .drawer-handle { width: 40px; height: 5px; background: rgba(0,0,0,0.2); border-radius: 10px; }
+
+        /* ========= RWD: Mobile Styles (< 900px) ========= */
+        @media (max-width: 899px) {
+            .main-container { flex-direction: column; }
+            
+            .preview-stage {
+                height: 100%;
+                padding-bottom: 80px;
+            }
+
+            .controls-panel {
+                position: fixed; bottom: 0; left: 0; width: 100%;
+                height: 60vh;
+                border-radius: 24px 24px 0 0;
+                box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+                transform: translateY(0);
+            }
+
+            .controls-panel.collapsed {
+                transform: translateY(calc(100% - var(--tab-bar-height) - 24px));
+            }
+
+            .drawer-handle-bar { display: flex; }
+            .tab-bar { padding-bottom: 10px; }
+        }
+
+        /* ========= RWD: Desktop Styles (>= 900px) ========= */
+        @media (min-width: 900px) {
+            .main-container { flex-direction: row; }
+
+            .preview-stage {
+                width: calc(100% - 380px);
+                height: 100%;
+            }
+
+            .controls-panel {
+                width: 380px;
+                height: 100%;
+                border-left: 1px solid rgba(255,255,255,0.4);
+                position: relative; 
+                transform: none !important;
+                border-radius: 0;
+            }
+
+            .drawer-handle-bar { display: none; }
+            .tab-bar { border-top: 1px solid rgba(0,0,0,0.1); }
+        }
+
+
+        /* --- UI Components --- */
+        .control-group-title { font-size: 13px; font-weight: 700; color: #666; margin-bottom: 10px; display: block; }
+        .color-row { display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; font-size: 14px; color: #555; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        input[type="color"] { border: none; width: 32px; height: 32px; background: none; border-radius: 50%; overflow: hidden; cursor: pointer; }
+        .mode-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 15px; }
+        .chip { padding: 8px 16px; background: #fff; border-radius: 20px; font-size: 13px; color: #666; white-space: nowrap; border: 1px solid transparent; transition: 0.2s; cursor: pointer; }
+        .chip.active { background: var(--accent-color); color: #fff; box-shadow: 0 4px 10px rgba(139, 94, 60, 0.3); }
+        
+        .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .guide-btn { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 12px; font-size: 14px; color: #555; text-align: left; transition: 0.2s; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+        .guide-btn span { font-size: 11px; opacity: 0.6; }
+        .guide-btn.active { border-color: var(--accent-color); background: #fff5ee; color: var(--accent-color); }
+
+        /* 引導說明區塊 */
+        .guide-description-box {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(139, 94, 60, 0.05);
+            border-left: 4px solid var(--accent-color);
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-color);
+            animation: fadeIn 0.3s;
+        }
+
+        .action-btn-large { width: 100%; padding: 16px; border: none; border-radius: 16px; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px; transition: 0.2s; color: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        /* 焦糖漸層 */
+        .btn-insta { 
+            background: linear-gradient(45deg, #8B5E3C 0%, #A67C52 25%, #C29B6D 50%, #A67C52 75%, #8B5E3C 100%); 
+            background-size: 200% auto;
+            transition: 0.3s;
+        }
+        .btn-insta:hover {
+            background-position: right center;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(139, 94, 60, 0.4);
+        }
+        .btn-wallpaper { background: #333; }
+
+        /* Bingo Grid Styles */
+        .main-title { font-family: var(--font-serif); font-size: 64px; font-weight: 900; color: var(--accent-color); letter-spacing: 4px; margin: 0; text-shadow: 0 2px 10px rgba(0,0,0,0.1); cursor: pointer; }
+        .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); gap: 12px; width: 900px; height: 900px; padding: 20px; position: relative; z-index: 2; }
+        .cell { background: var(--grid-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: var(--grid-border); border-radius: 20px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 15px; font-size: 28px; color: var(--text-color); font-weight: 500; position: relative; cursor: pointer; overflow: hidden; word-break: break-word; }
+        .cell:nth-child(13) { font-weight: 700; border-width: 2px; border-color: var(--accent-color); }
+        .cell.highlight { background: rgba(255, 255, 255, 0.95); box-shadow: 0 0 30px var(--highlight-color); transform: scale(1.05); z-index: 5; border: 3px solid var(--accent-color); }
+        .cell.dimmed { opacity: 0.4; filter: grayscale(0.5); }
+        .cell:empty::before { content: attr(data-hint); color: var(--text-color); opacity: 0.3; font-size: 20px; pointer-events: none; }
+        .footer-signature { margin-top: 10px; font-family: var(--font-sans); font-size: 16px; opacity: 0.6; color: var(--text-color); letter-spacing: 2px; z-index: 2; }
+        .bg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.2); pointer-events: none; z-index: 0; }
+
+        /* Edit Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; animation: fadeIn 0.2s; }
+        .modal-content { background: #fff; width: 85%; max-width: 360px; padding: 25px; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 20px; }
+        .modal-textarea { width: 100%; height: 100px; padding: 15px; border: 1px solid #eee; border-radius: 16px; font-size: 16px; resize: none; background: #f8f8f8; font-family: var(--font-sans); }
+        .modal-textarea:focus { background: #fff; border-color: var(--accent-color); }
+        .modal-btns { display: flex; gap: 10px; }
+        .m-btn { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 15px; font-weight: bold; cursor: pointer; }
+        .m-save { background: var(--accent-color); color: #fff; }
+        .m-cancel { background: #f0f0f0; color: #666; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <nav class="app-bar">
+        <a href="https://anjui2025.github.io/caramel.unit/" target="_blank" class="app-logo-link">
+            <img src="logo2.png" alt="Logo" class="app-logo-img">
+            <span class="app-logo-text">Caramel Unit</span>
+        </a>
+        <div class="app-action" onclick="clearData()">
+            <i class="fas fa-redo-alt"></i> 重置
+        </div>
+    </nav>
+
+    <div class="main-container">
+        
+        <div class="preview-stage" id="preview-stage" onclick="closeDrawer()">
+            <div id="render-target">
+                <div class="bg-overlay" id="bg-overlay"></div>
+                <div class="header-section">
+                    <div class="main-title" id="main-title" onclick="event.stopPropagation(); openTitleModal()">2026 人生賓果</div>
+                </div>
+                <div class="bingo-grid" id="bingo-grid"></div>
+                <div class="footer-signature">Designed by Caramel Unit</div>
+            </div>
+        </div>
+
+        <div class="controls-panel" id="controls-drawer">
+            <div class="drawer-handle-bar" onclick="toggleDrawer()">
+                <div class="drawer-handle"></div>
+            </div>
+
+            <div class="drawer-content-container">
+                
+                <div class="drawer-section active" id="tab-content-guide">
+                    <span class="control-group-title">高亮顯示區域</span>
+                    <div class="guide-grid">
+                        <button class="guide-btn" onclick="setGuide('center', this)">會呼吸的肉<span>正中心</span></button>
+                        <button class="guide-btn" onclick="setGuide('corners', this)">花轟也想完成的事<span>四角落</span></button>
+                        <button class="guide-btn" onclick="setGuide('cross', this)">今年要幹嘛<span>十字</span></button>
+                        <button class="guide-btn" onclick="setGuide('gap', this)">做就對了<span>間隔</span></button>
+                        <button class="guide-btn" onclick="setGuide('outer', this)">運氣就是你的超能力<span>邊緣</span></button>
+                        <button class="guide-btn active" onclick="setGuide('none', this)">全部顯示<span>預覽</span></button>
+                    </div>
+                    <div class="guide-description-box" id="guide-desc">
+                        填寫模式：顯示完整的賓果盤。
+                    </div>
+                </div>
+
+                <div class="drawer-section" id="tab-content-style">
+                    <span class="control-group-title">文字顏色</span>
+                    <div class="color-row">
+                        <span>選擇顏色</span>
+                        <input type="color" id="title-color-picker" value="#8B5E3C" oninput="updateTitleColor(this.value)">
+                    </div>
+
+                    <span class="control-group-title" style="margin-top: 20px;">背景設定</span>
+                    <div class="mode-chips">
+                        <div class="chip active" onclick="setBgMode('default', this)">經典</div>
+                        <div class="chip" onclick="setBgMode('solid', this)">單色</div>
+                        <div class="chip" onclick="setBgMode('gradient', this)">漸層</div>
+                        <div class="chip" onclick="setBgMode('image', this)">上傳</div>
+                    </div>
+
+                    <div id="bg-ui-default" style="padding:10px; background:rgba(255,255,255,0.5); border-radius:12px; font-size:13px; color:#666;">
+                        使用 Caramel Unit 經典模板。
+                    </div>
+                    <div id="bg-ui-solid" style="display:none;">
+                        <div class="color-row"><span>背景色</span><input type="color" id="bg-solid-color" value="#F5E6DA" oninput="updateBgState()"></div>
+                    </div>
+                    <div id="bg-ui-gradient" style="display:none;">
+                        <div class="color-row"><span>漸層起點</span><input type="color" id="bg-grad-1" value="#E0C3FC" oninput="updateBgState()"></div>
+                        <div class="color-row"><span>漸層終點</span><input type="color" id="bg-grad-2" value="#8EC5FC" oninput="updateBgState()"></div>
+                    </div>
+                    <div id="bg-ui-image" style="display:none;">
+                        <button class="action-btn-large" style="background:#fff; color:#333; font-weight:500; border:1px solid #ddd;" onclick="document.getElementById('bg-file').click()">
+                            <i class="fas fa-image"></i> 選擇圖片...
+                        </button>
+                        <input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
+                        <div style="margin-top:15px;">
+                            <span class="control-group-title">遮罩濃度 <span id="overlay-val" style="font-weight:400; margin-left:5px;">20%</span></span>
+                            <input type="range" style="width:100%;" min="0" max="90" value="20" oninput="updateOverlay(this.value)">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="drawer-section" id="tab-content-export">
+                    <span class="control-group-title">下載圖片</span>
+                    <button class="action-btn-large btn-insta" onclick="downloadImage('square')">
+                        <i class="fab fa-instagram"></i> 下載 1:1 (IG)
+                    </button>
+                    <button class="action-btn-large btn-wallpaper" onclick="downloadImage('wallpaper')">
+                        <i class="fas fa-mobile-alt"></i> 下載 9:16 (桌布)
+                    </button>
+                </div>
+            </div>
+
+            <div class="tab-bar">
+                <div class="tab-item active" onclick="switchTab('guide', this)">
+                    <i class="far fa-lightbulb"></i> 引導
+                </div>
+                <div class="tab-item" onclick="switchTab('style', this)">
+                    <i class="fas fa-palette"></i> 風格
+                </div>
+                <div class="tab-item" onclick="switchTab('export', this)">
+                    <i class="fas fa-download"></i> 輸出
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="text-align:center; color:#8B5E3C;" id="modal-title-text">編輯內容</h3>
+            <textarea id="modal-input" class="modal-textarea" placeholder="輸入目標..."></textarea>
+            <div class="modal-btns">
+                <button class="m-btn m-cancel" onclick="closeModal()">取消</button>
+                <button class="m-btn m-save" onclick="saveModal()">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="modal-overlay">
+        </div>
+
+    <div id="welcome-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h3 style="color:#8B5E3C; font-size:20px; margin-bottom:10px;">歡迎使用！</h3>
+            
+            <div style="font-size:15px; color:#555; line-height:1.6; text-align: left; padding: 0 10px;">
+                <p>這是一個幫助你規劃 2026 年目標的人生賓果。總共有25格，填寫方式可以看引導選單~</p>
+                <ul style="margin: 10px 0 10px 20px;">
+                    <li>點擊格子可以填寫內容</li>
+                    <li>點擊引導會有每一格的說明</li>
+                    <li>下方選單可調整風格與下載</li>
+                </ul>
+                <p>✨2026年你一定會天天開心✨</p>
+            </div>
+
+            <div style="margin-top: 10px; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;" onclick="toggleNoShow()">
+                <input type="checkbox" id="no-show-again" style="width:16px; height:16px; cursor:pointer;">
+                <label for="no-show-again" style="font-size:14px; color:#666; cursor:pointer;">不再顯示此視窗</label>
+            </div>
+
+            <button class="m-btn m-save" style="width:100%; margin-top:10px;" onclick="closeWelcome()">開始使用</button>
+        </div>
+    </div>
+
+    <script>
+        const grid = document.getElementById('bingo-grid');
+        const renderTarget = document.getElementById('render-target');
+        const drawer = document.getElementById('controls-drawer');
+        const guideDesc = document.getElementById('guide-desc');
+        const STORAGE_KEY = 'caramel_bingo_v12'; // 更新版本號
+        
+        let state = {
+            cells: Array(25).fill(''),
+            title: '2026 人生賓果',
+            titleColor: '#8B5E3C',
+            bgMode: 'default', 
+            bgConfig: { solid: '#F5E6DA', grad1: '#E0C3FC', grad2: '#8EC5FC', image: null },
+            overlayOpacity: 0.2
+        };
+        let currentEditingIndex = -1;
+
+        window.onload = () => { 
+            initGrid(); loadData(); adjustPreviewScale(); 
+            window.addEventListener('resize', adjustPreviewScale); 
+            checkWelcome(); // 【新增】檢查是否要顯示歡迎視窗
+        };
+
+        // --- 歡迎視窗邏輯 ---
+        function checkWelcome() {
+            // 檢查 localStorage 是否有紀錄
+            const hasSeen = localStorage.getItem('caramel_bingo_welcome_seen');
+            if (!hasSeen) {
+                // 如果沒看過 (或沒勾選不再顯示)，就顯示彈窗
+                // 延遲 0.5 秒出現，讓畫面先載入好，體驗較佳
+                setTimeout(() => {
+                    document.getElementById('welcome-modal').classList.add('show');
+                }, 500);
+            }
+        }
+
+        function closeWelcome() {
+            const checkbox = document.getElementById('no-show-again');
+            if (checkbox.checked) {
+                // 如果勾選了，就存入 localStorage
+                localStorage.setItem('caramel_bingo_welcome_seen', 'true');
+            }
+            document.getElementById('welcome-modal').classList.remove('show');
+        }
+        
+        // 點擊文字也能觸發 checkbox
+        function toggleNoShow() {
+            const checkbox = document.getElementById('no-show-again');
+            checkbox.checked = !checkbox.checked;
+        }
+
+        // --- Drawer Logic ---
+        function toggleDrawer() { drawer.classList.toggle('collapsed'); }
+        function openDrawer() { drawer.classList.remove('collapsed'); }
+        function closeDrawer() { if(window.innerWidth < 900) drawer.classList.add('collapsed'); }
+
+        // --- Tabs Logic ---
+        function switchTab(tabName, el) {
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            document.querySelectorAll('.drawer-section').forEach(c => c.classList.remove('active'));
+            document.getElementById(`tab-content-${tabName}`).classList.add('active');
+            openDrawer();
+        }
+
+        // --- Grid & Modal ---
+        function initGrid() {
+            grid.innerHTML = '';
+            for (let i = 0; i < 25; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.onclick = (e) => { e.stopPropagation(); openModal(i); };
+                grid.appendChild(cell);
+            }
+        }
+
+        // --- 新增：取得格子對應的分類名稱 ---
+        function getCellCategory(i) {
+            if (i === 12) return '會呼吸的肉';
+            if ([6, 8, 16, 18].includes(i)) return '花轟也想完成的事';
+            if ([7, 11, 13, 17].includes(i)) return '今年要幹嘛';
+            if ([1, 3, 5, 9, 15, 19, 21, 23].includes(i)) return '做就對了';
+            if ([0, 2, 4, 10, 14, 20, 22, 24].includes(i)) return '運氣就是你的超能力';
+            return '目標';
+        }
+
+        function openModal(index) {
+            currentEditingIndex = index;
+            document.getElementById('edit-modal').classList.add('show');
+            const input = document.getElementById('modal-input');
+            const title = document.getElementById('modal-title-text');
+            
+            if(index === -1) { 
+                title.innerText = "編輯標題"; 
+                input.value = state.title; 
+            } else { 
+                // 修改：這裡呼叫上面的函式來顯示名稱，而不是顯示第幾格
+                const catName = getCellCategory(index);
+                title.innerText = `編輯：${catName}`; 
+                input.value = state.cells[index]; 
+            }
+            setTimeout(() => input.focus(), 100);
+        }
+        function openTitleModal() { openModal(-1); }
+        function closeModal() { document.getElementById('edit-modal').classList.remove('show'); document.getElementById('modal-input').blur(); }
+        function saveModal() {
+            const val = document.getElementById('modal-input').value;
+            if(currentEditingIndex === -1) { state.title = val; document.getElementById('main-title').innerText = val; }
+            else { 
+                state.cells[currentEditingIndex] = val; 
+                const cell = grid.children[currentEditingIndex];
+                cell.innerText = val; fitText(cell);
+            }
+            saveLocal(); closeModal();
+        }
+        function fitText(el) {
+            let size = 28; el.style.fontSize = size + 'px';
+            while (el.scrollHeight > el.clientHeight && size > 12) { size--; el.style.fontSize = size + 'px'; }
+        }
+
+        // --- Visuals ---
+        function updateVisuals() {
+            renderTarget.style.backgroundImage = 'none'; renderTarget.style.backgroundColor = '';
+            if (state.bgMode === 'default') renderTarget.style.backgroundColor = 'var(--bg-color)';
+            else if (state.bgMode === 'solid') renderTarget.style.backgroundColor = state.bgConfig.solid;
+            else if (state.bgMode === 'gradient') renderTarget.style.backgroundImage = `linear-gradient(135deg, ${state.bgConfig.grad1}, ${state.bgConfig.grad2})`;
+            else if (state.bgMode === 'image' && state.bgConfig.image) renderTarget.style.backgroundImage = `url(${state.bgConfig.image})`;
+
+            document.getElementById('main-title').innerText = state.title;
+            document.getElementById('main-title').style.color = state.titleColor;
+            document.getElementById('bg-overlay').style.backgroundColor = `rgba(255,255,255,${state.overlayOpacity})`;
+            document.getElementById('overlay-val').innerText = Math.round(state.overlayOpacity * 100) + '%';
+            adjustPreviewScale();
+        }
+
+        function updateTitleColor(val) {
+            state.titleColor = val;
+            document.getElementById('main-title').style.color = val;
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => { cell.style.color = val; });
+            if (cells[12]) { cells[12].style.borderColor = val; }
+            const footer = document.querySelector('.footer-signature');
+            if (footer) footer.style.color = val;
+            saveLocal();
+        }
+
+        // 【修復】這裡補回了 setBgMode 函式
+        function setBgMode(mode, chip) {
+            state.bgMode = mode;
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active')); chip.classList.add('active');
+            ['default', 'solid', 'gradient', 'image'].forEach(m => document.getElementById(`bg-ui-${m}`).style.display = (m === mode) ? 'block' : 'none');
+            updateVisuals(); saveLocal();
+        }
+
+        function updateBgState() {
+            state.bgConfig.solid = document.getElementById('bg-solid-color').value;
+            state.bgConfig.grad1 = document.getElementById('bg-grad-1').value;
+            state.bgConfig.grad2 = document.getElementById('bg-grad-2').value;
+            updateVisuals(); saveLocal();
+        }
+        function handleImageUpload(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => { state.bgConfig.image = e.target.result; updateVisuals(); saveLocal(); };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        function updateOverlay(val) { state.overlayOpacity = val / 100; updateVisuals(); saveLocal(); }
+        
+        // --- Guide Logic ---
+        function setGuide(key, btn) {
+            document.querySelectorAll('.guide-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active');
+            const cells = document.querySelectorAll('.cell'); cells.forEach(c => { c.classList.remove('highlight', 'dimmed'); c.removeAttribute('data-hint'); });
+            
+            const guideInfo = {
+                'center':  { ids: [12], text: '【核心目標】正中心：填寫今年只要會呼吸就可以達成的事情！(例如:喝100ml的水)' },
+                'corners': { ids: [6, 8, 16, 18], text: '【認真目標】內四角：非常認真想要完成的四個目標，寫的月具體越好唷~(例如：讀完四本書)' },
+                'cross':   { ids: [7, 11, 13, 17], text: '【年度相關】小十字：跟今年的特定計畫或主題息息相關的四個願望。(例如：看經典賽轉播)' },
+                'gap':     { ids: [1, 3, 5, 9, 15, 19, 21, 23], text: '【簡單行動】大圈間隔：利用假日或空閒時間就能完成的目標(例如：去看一場電影)。' },
+                'outer':   { ids: [0, 2, 4, 10, 14, 20, 22, 24], text: '【夢想挑戰】外圍剩餘格：有點難度，靠努力也不一定能達成，但希望能發生。(例如：找到另一半)' },
+                'none':    { ids: [], text: '全部顯示：顯示完整的賓果盤。' }
+            };
+
+            const info = guideInfo[key];
+            if (info) {
+                guideDesc.innerText = info.text;
+                if(key !== 'none') {
+                    cells.forEach((c, i) => { 
+                        if (info.ids.includes(i)) { c.classList.add('highlight'); c.setAttribute('data-hint', '目標'); } 
+                        else c.classList.add('dimmed'); 
+                    });
+                }
+            }
+        }
+
+        function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+        function loadData() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                state = { ...state, ...JSON.parse(saved) };
+                const cells = document.querySelectorAll('.cell');
+                state.cells.forEach((txt, i) => { if(cells[i]) { cells[i].innerText = txt; fitText(cells[i]); } });
+                document.getElementById('title-color-picker').value = state.titleColor;
+                document.getElementById('bg-solid-color').value = state.bgConfig.solid;
+                document.querySelector('input[type=range]').value = state.overlayOpacity * 100;
+                updateVisuals();
+                // 讀檔後也要更新文字顏色
+                updateTitleColor(state.titleColor);
+            }
+        }
+        function clearData() { if(confirm('確定清除？')) { localStorage.removeItem(STORAGE_KEY); location.reload(); } }
+        
+        function adjustPreviewScale() {
+            const stage = document.getElementById('preview-stage'); 
+            const target = document.getElementById('render-target'); 
+            const padding = 30;
+            const scale = Math.min((stage.clientWidth - padding) / target.offsetWidth, (stage.clientHeight - padding) / target.offsetHeight, 1);
+            target.style.transform = `scale(${scale})`;
+        }
+
+        async function downloadImage(type) {
+            setGuide('none', document.querySelector('.guide-btn:last-child'));
+            const target = document.getElementById('render-target');
+            const clone = target.cloneNode(true);
+            
+            clone.style.transform = 'none'; clone.style.position = 'fixed'; clone.style.top = '0'; clone.style.left = '0'; clone.style.zIndex = '-9999'; clone.style.margin = '0';
+            clone.style.backgroundImage = target.style.backgroundImage; clone.style.backgroundColor = target.style.backgroundColor;
+            
+            clone.querySelectorAll('.cell').forEach(c => c.onclick = null);
+            if(clone.querySelector('.main-title')) clone.querySelector('.main-title').onclick = null;
+
+            if (type === 'wallpaper') {
+                clone.style.width = '1080px'; clone.style.height = '1920px';
+                clone.style.justifyContent = 'flex-start'; 
+                clone.style.paddingTop = '800px'; 
+                const title = clone.querySelector('.main-title');
+                const grid = clone.querySelector('.bingo-grid');
+                if(grid) { grid.style.transform = 'scale(0.85)'; grid.style.marginTop = '20px'; }
+                if(title) { title.style.transform = 'scale(0.9)'; title.style.marginBottom = '-100px'; }
+                const footer = clone.querySelector('.footer-signature');
+                if(footer) { footer.style.position = 'absolute'; footer.style.bottom = '50px'; }
+            } else {
+                clone.style.width = '1080px'; clone.style.height = '1080px';
+                const footer = clone.querySelector('.footer-signature');
+                if(footer) footer.style.marginTop = '10px';
+            }
+
+            document.body.appendChild(clone);
+            try {
+                const canvas = await html2canvas(clone, { scale: 1, useCORS: true, backgroundColor: null, logging: false, windowWidth: 1080, windowHeight: type === 'wallpaper' ? 1920 : 1080 });
+                const link = document.createElement('a'); link.download = `Bingo-${type}-${Date.now()}.png`; link.href = canvas.toDataURL('image/png'); link.click();
+            } catch (err) { console.error(err); alert("截圖失敗"); } finally { document.body.removeChild(clone); }
+        }
+    </script>
+</body>
+</html>
